@@ -1,3 +1,13 @@
+# Notes & Temp files
+docs/private/
+*.local.md
+*.old*
+*.bak*
+*.backup*
+NOTES.md
+*.tmp
+*.orig*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

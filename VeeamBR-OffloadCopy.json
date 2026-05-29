@@ -1,0 +1,9 @@
+{
+  "VeeamConfigBackupFolder": "VeeamConfigBackup",
+  "LogPath": "C:\\Logs",
+  "Smtp": {
+    "Server": "smtp.company.com",
+    "From": "backup@company.com",
+    "To": "user@company.com"
+  }
+}
