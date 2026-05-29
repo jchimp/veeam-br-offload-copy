@@ -9,22 +9,17 @@ That is why we have AltDestination exists, we use it to specify the two location
 
 1. **Validates** the specified backup job exists and completed successfully
 2. **Retrieves** the backup repository path from Veeam
-3. **Copies** the backup files to a primary destination using RoboCopy
-4. **Copies** the backup files to a secondary destination (if available)
-5. **Includes** Veeam configuration backups in the copy operations
-6. **Logs** all operations and sends results via email
+3. **Copies** the backup files to a primary destination, and secondary destination (if available) using RoboCopy
+4. **Includes** Veeam configuration backups in the copy operations
+5. **Logs** all operations and sends results via email
 
 ## Features
 
 - Supports standard Veeam backup jobs and NAS backup jobs
 - Handles both single repository and Scale-Out Backup Repository (SOBR) configurations
-- Validates RoboCopy exit codes to detect copy failures
 - Rotates between two alternate offsite storage drives automatically
-- Test mode for dry-run validation
-- Comprehensive logging with transcript rotation (keeps last 3 logs)
-- Email notifications with detailed results
-- Error tracking with summary reporting
-- Centralized configuration via JSON file
+- Logging with transcript rotation (keeps last 3 logs)
+- Email notifications with results
 
 ## Installation
 
@@ -151,10 +146,3 @@ This approach allows you to:
 - Control which jobs get offloaded
 - Easily add or remove jobs from offload operations
 - Maintain a single PowerShell script for all offload operations
-
-## Notes
-- RoboCopy exit codes 0-3 are treated as success; 4+ are failures
-- /mir flag used - destination is mirrored to match source
-- Multi-threaded copy enabled (/mt:16) for faster transfers
-- Configuration backups are included automatically if available
-- JSON config file is loaded on each execution (changes take effect immediately)
