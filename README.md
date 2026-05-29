@@ -110,11 +110,6 @@ Alternatively, schedule each batch file as a Windows Task Scheduler task to run 
 .\VeeamBR-OffloadCopy.ps1 -BackupJobName "Daily Backup" -PrimaryDestination "\\NAS01\VeeamBackups" -AltDestination1 "E:\VeeamBackups" -AltDestination2 "F:\VeeamBackups"
 ```
 
-### Dry-Run Test
-```powershell
-.\VeeamBR-OffloadCopy.ps1 -BackupJobName "Daily Backup" -PrimaryDestination "\\NAS01\VeeamBackups" -DryRun
-```
-
 ### Custom Config File Location
 ```powershell
 .\VeeamBR-OffloadCopy.ps1 -BackupJobName "Daily Backup" -PrimaryDestination "\\NAS01\VeeamBackups" -ConfigFile "D:\Config\VeeamBR-OffloadCopy.json"
@@ -125,24 +120,3 @@ Alternatively, schedule each batch file as a Windows Task Scheduler task to run 
 @ECHO OFF
 powershell -ExecutionPolicy Bypass ".\VeeamBR-OffloadCopy.ps1 -BackupJobName 'Daily Servers' -PrimaryDestination '\\NAS01\VeeamBackups' -AltDestination1 'E:\VeeamBackups' -AltDestination2 'F:\VeeamBackups'"
 ```
-
-## Supported Backup Job Types
-- Standard Backup Jobs
-- NAS Backup Jobs
-- Jobs using local repositories (WinLocal)
-- Jobs using Scale-Out Backup Repositories (SOBR) with single local extent
-
-## Scheduling via Veeam Job
-
-The recommended approach is to create a batch file for each backup job and configure it as a **Post-job activity script** in Veeam:
-
-1. One batch file per backup job (e.g., `VeeamBR-OffloadCopy_DailyServers.bat`)
-2. Each batch file calls the PowerShell script with job-specific parameters
-3. Schedule the batch file in Veeam's job settings to run after the backup completes
-4. All jobs use the same PowerShell script and shared JSON configuration
-
-This approach allows you to:
-- Run different destinations for different backup jobs
-- Control which jobs get offloaded
-- Easily add or remove jobs from offload operations
-- Maintain a single PowerShell script for all offload operations
