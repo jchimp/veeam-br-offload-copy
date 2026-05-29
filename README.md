@@ -2,8 +2,7 @@
 
 A PowerShell script that automates offloading Veeam Backup & Replication jobs to network shares and rotated offsite storage drives (USB, external drives, etc.).
 
-The secondary location is typically a rotated offsite drive (USB) or network share. 
-That is why we have AltDestination exists, we use it to specify the two locations the USB drive might show up as.
+The secondary location is typically a rotated offsite drive (USB) or network share. That is what AltDestination1 and AltDestination2 are for - they are used to specify the two locations the USB drive might show up as.
 
 ## How It Works
 
