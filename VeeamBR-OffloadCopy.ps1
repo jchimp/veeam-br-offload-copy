@@ -71,7 +71,7 @@ $ErrorActionPreference = "Continue"
 $VerbosePreference = "SilentlyContinue"
 
 #######################################
-# Settings
+# Config values
 #######################################
 $SecondaryDestination = ""
 $MailTo = ""
@@ -80,20 +80,21 @@ $SmtpServer = ""
 $configBackupFolder = ""
 $transcriptPath = ""
 
+#######################################
+# Settings
+#######################################
+$transcriptName = ""
 $copyDestPrimary = ""
 $copyDestSecondary = ""
 $copySource = ""
-
-$copyFlags    = @("/e", "/copy:dat", "/dcopy:dat", "/w:30", "/r:3", "/fft", "/z", "/np", "/mt:16") 
+$copyFlags    = @("/e", "/copy:dat", "/dcopy:dat", "/w:30", "/r:3", "/fft", "/z", "/np", "/mt:16", "/nfl") 
 $copyOptions  = @("/mir", "/xf", "thumbs.db", "desktop.ini")
-
-$transcriptName = "ROBOCOPY-VBROffload_NAME_Log.txt"
+$copyFlagsConfig = $copyFlags + @("/njh", "/njs")
 
 # Counters for tracking operations
 $RoboCopyErrors = @()
 $warningMessages = @()
 $copyOperations = @()
-$roboCopyStats = @{}
 
 # Script mode tracking
 $script:DryRunMode = $DryRun.IsPresent
@@ -106,7 +107,6 @@ $endDateTime = $null
 #######################################
 # Functions
 #######################################
-
 function Write-Log {
     param([string]$Message, [string]$Level = "INFO")
 
@@ -181,49 +181,6 @@ function Test-PathAccessibility {
     return $true
 }
 
-function Parse-RoboCopyStats {
-    param([string]$LogContent)
-    
-    # Parse ROBOCOPY log output for statistics
-    # Looking for lines like:
-    # New Files        : 1234
-    # Bytes Copied     : 1,234,567,890
-    
-    $stats = @{
-        FilesCount = 0
-        BytesCopied = 0
-        Speed = ""
-    }
-    
-    try {
-        # Extract file count
-        if ($LogContent -match "New Files\s+:\s+([\d,]+)") {
-            $stats.FilesCount = [int]($matches[1] -replace ",", "")
-        }
-        
-        # Extract bytes copied
-        if ($LogContent -match "Bytes Copied\s+:\s+([\d,]+)") {
-            $stats.BytesCopied = [long]($matches[1] -replace ",", "")
-        }
-        
-        # Extract speed (e.g., "1.5 m/s")
-        if ($LogContent -match "Speed\s+:\s+([\d.,]+\s+[a-z/]+)") {
-            $stats.Speed = $matches[1]
-        }
-    }
-    catch {
-        Write-Log "Could not parse ROBOCOPY statistics: $_" "WARN"
-    }
-    
-    return $stats
-}
-
-function Format-BytesToMB {
-    param([long]$Bytes)
-    if ($Bytes -eq 0) { return "0 MB" }
-    return "{0:N2} MB" -f ($Bytes / 1MB)
-}
-
 function Test-JsonConfig {
     param([Parameter(Mandatory)][string]$Path)
 
@@ -267,10 +224,9 @@ try {
         Write-Error "Failed to validate configuration file. Exiting."
         exit 1 
     }
-
     $config = Get-Content -LiteralPath $ConfigFile -Raw | ConvertFrom-Json
 
-    # Load config values
+    # Load config values from JSON cofig
     $configBackupFolder = $config.VeeamConfigBackupFolder
     $transcriptPath = $config.LogPath
     $MailTo = $config.Smtp.To
@@ -397,7 +353,6 @@ try {
     If (-not $job) {
         throw "Could not find backup job: $BackupJobName"
     }
-
     $lastResult = $job.GetLastResult()
     If ($lastResult -eq "Failed") {
         throw "Last backup job result was 'Failed'. Not proceeding with offload copy."
@@ -500,9 +455,9 @@ try {
     Write-Log "====================================================="
     Write-Log ""
 
-    #############################
+    ##################################################
     # Copy to Primary path/destination
-    #############################
+    ##################################################
     $copyDestPrimary = Join-Path -Path $PrimaryDestination -ChildPath $destPath
     $copyDestPrimaryConfig = Join-Path -Path $PrimaryDestination -ChildPath $configBackupSource.Substring(3)
 
@@ -518,8 +473,7 @@ try {
             Write-Log "Would execute: ROBOCOPY `"$copySource`" `"$copyDestPrimary`" (with flags)" "DRYRUN"
         }
         else {
-            $roboCopyOutput = ROBOCOPY "$copySource" "$copyDestPrimary" $copyFlags $copyOptions 2>&1 | Out-String
-            $roboCopyStats["PRIMARY"] = Parse-RoboCopyStats -LogContent $roboCopyOutput
+            & ROBOCOPY "$copySource" "$copyDestPrimary" "*.*" @copyFlags @copyOptions 2>&1 | Out-String
         }
         $primaryExitCode = $LASTEXITCODE
 
@@ -544,7 +498,7 @@ try {
                 Write-Log "Would execute: ROBOCOPY `"$configBackupSource`" `"$copyDestPrimaryConfig`" (with flags)" "DRYRUN"
             }
             else {
-                ROBOCOPY "$configBackupSource" "$copyDestPrimaryConfig" $copyFlags $copyOptions
+                ROBOCOPY "$configBackupSource" "$copyDestPrimaryConfig" $copyFlagsConfig $copyOptions
             }
             $configPrimaryExitCode = $LASTEXITCODE
 
@@ -561,9 +515,9 @@ try {
         throw "Primary destination path is not reachable: $PrimaryDestination"
     }
 
-    #############################
+    ####################################################
     # Copy to Secondary path/destination
-    #############################   
+    ####################################################   
     If($SecondaryDestination.Length -gt 0) {
         Write-Log ""
         Write-Log ""
@@ -587,8 +541,7 @@ try {
                 Write-Log "Would execute: ROBOCOPY `"$copySource`" `"$copyDestSecondary`" (with flags)" "DRYRUN"
             }
             else {
-                $roboCopyOutput = ROBOCOPY "$copySource" "$copyDestSecondary" $copyFlags $copyOptions 2>&1 | Out-String
-                $roboCopyStats["SECONDARY"] = Parse-RoboCopyStats -LogContent $roboCopyOutput
+                & ROBOCOPY "$copySource" "$copyDestSecondary" "*.*" @copyFlags @copyOptions 2>&1 | Out-String
             }
             $secondaryExitCode = $LASTEXITCODE
             
@@ -613,7 +566,7 @@ try {
                     Write-Log "Would execute: ROBOCOPY `"$configBackupSource`" `"$copyDestSecondaryConfig`" (with flags)" "DRYRUN"
                 }
                 else {
-                    ROBOCOPY "$configBackupSource" "$copyDestSecondaryConfig" $copyFlags $copyOptions
+                    ROBOCOPY "$configBackupSource" "$copyDestSecondaryConfig" $copyFlagsConfig $copyOptions
                 }
                 $configSecondaryExitCode = $LASTEXITCODE
                 
@@ -687,10 +640,8 @@ If ($warningMessages.Count -gt 0) {
     }
 }
 
-Write-Log "========================================================="
-Write-Log ""
+Write-Log "=========================================================`n"
 
-# End
 Stop-Transcript
 
 # Email results
@@ -715,20 +666,13 @@ try {
         }
 
         $destEscaped = [System.Net.WebUtility]::HtmlEncode($op.Destination)
-
-        # Get stats for this operation
-        $opStats = $roboCopyStats[$op.Destination]
-        $filesInfo = if ($opStats) { "$($opStats.FilesCount) files" } else { "N/A" }
-        $bytesInfo = if ($opStats) { Format-BytesToMB -Bytes $opStats.BytesCopied } else { "N/A" }
-        $speedInfo = if ($opStats -and $opStats.Speed) { $opStats.Speed } else { "N/A" }
+        $targetEscaped = [System.Net.WebUtility]::HtmlEncode($op.Target)
 
         $operationRows += @"
         <tr>
             <td style="padding:8px;border:1px solid #ddd;">$destEscaped</td>
             <td style="padding:8px;border:1px solid #ddd;color:${statusColor};font-weight:bold;">$statusIcon $($op.Status)</td>
-            <td style="padding:8px;border:1px solid #ddd;font-size:0.9em;">$filesInfo</td>
-            <td style="padding:8px;border:1px solid #ddd;font-size:0.9em;">$bytesInfo</td>
-            <td style="padding:8px;border:1px solid #ddd;font-size:0.9em;">$speedInfo</td>
+            <td style="padding:8px;border:1px solid #ddd;font-size:0.9em;">$targetEscaped</td>
         </tr>
 "@
     }
@@ -750,14 +694,6 @@ try {
         <tr style="border:none;">
             <td style="padding:4px 12px 4px 0;color:#555;font-weight:bold;width:180px;border:none;">Source Repository:</td>
             <td style="padding:4px 0;border:none;">$([System.Net.WebUtility]::HtmlEncode($repoPath))</td>
-        </tr>
-        <tr style="border:none;">
-            <td style="padding:4px 12px 4px 0;color:#555;font-weight:bold;width:180px;border:none;">Primary Destination:</td>
-            <td style="padding:4px 0;border:none;">$([System.Net.WebUtility]::HtmlEncode($PrimaryDestination))</td>
-        </tr>
-        <tr style="border:none;">
-            <td style="padding:4px 12px 4px 0;color:#555;font-weight:bold;width:180px;border:none;">Secondary Destination:</td>
-            <td style="padding:4px 0;border:none;">$(if ($SecondaryDestination.Length -gt 0) { [System.Net.WebUtility]::HtmlEncode($SecondaryDestination) } else { "N/A" })</td>
         </tr>
     </table>
 "@
@@ -793,7 +729,7 @@ try {
         <p>
             <strong>Server:</strong> $Servername &nbsp;|&nbsp;
             <strong>Time:</strong> $reportTime &nbsp;|&nbsp;
-            <strong>Status:</strong> <span class="$(if ($subjectStatus -eq 'SUCCESS') { 'success' } else { 'failed' })"><strong>$subjectStatus</strong></span>
+            <strong>Status:</strong> <span class="$(if ($subjectStatus -eq 'Success') { 'success' } else { 'failed' })"><strong>$subjectStatus</strong></span>
         </p>
         
         <h3>Job Details</h3>
@@ -804,9 +740,7 @@ try {
             <tr>
                 <th>Destination</th>
                 <th>Status</th>
-                <th>Files Copied</th>
-                <th>Data Transferred</th>
-                <th>Speed</th>
+                <th>Target Path</th>
             </tr>
             $operationRows
         </table>
@@ -835,7 +769,7 @@ try {
             $errorRows += "<li>$errEscaped</li>"
         }
         $html += @"
-        <h3 class="failed">⚠️ Errors</h3>
+        <h3 class="failed">Errors</h3>
         <ul>$errorRows</ul>
 "@
     }
@@ -847,20 +781,21 @@ try {
             $warningRows += "<li>$warnEscaped</li>"
         }
         $html += @"
-        <h3 class="warning">⚠️ Warnings</h3>
+        <h3 class="warning">Warnings</h3>
         <ul>$warningRows</ul>
 "@
     }
 
     $html += @"
         <div class="footer">
-            Generated by VeeamBR-OffsiteCopy.ps1 | GitHub: <a href="https://github.com/jchimp/veeam-br-offsitecopy" style="color:#999;">jchimp/veeam-br-offsite-copy</a>
+            Generated by VeeamBR-OffloadCopy.ps1 | GitHub: <a href="https://github.com/jchimp/veeam-br-offload-copy" style="color:#999;">jchimp/veeam-br-offload-copy</a>
         </div>
     </div>
 </body>
 </html>
 "@
 
+    # Send email with HTML body and transcript log attached
     if ($script:DryRunMode) {
         Write-Log "Would send email report:" "DRYRUN"
         Write-Log "  From:    $MailFrom" "DRYRUN"
