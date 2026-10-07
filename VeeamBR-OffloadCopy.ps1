@@ -1,12 +1,12 @@
 <#
 .SYNOPSIS
     Copies Veeam B&R backup jobs repos to primary and secondary destinations using ROBOCOPY.
-    
+
 .DESCRIPTION
     Performs an offload copy of a Veeam B&R backup job from its local repository to network shares
     and rotated offsite drives (USB). Supports standard backup jobs, VMware backups, and NAS share jobs.
     Includes ROBOCOPY validation, path verification, comprehensive logging, and HTML email reporting.
-    
+
     Global configuration (email, logging paths, SMTP settings) is loaded from VeeamBR-OffloadCopy.json.
     Each backup job should have its own batch file that calls this script with job-specific parameters.
 
@@ -61,8 +61,8 @@
 Param (
     [string]$BackupJobName = $(throw "-BackupJobName is required"),
     [string]$PrimaryDestination = $(throw "-PrimaryDestination is required"),
-    [string]$AltDestination1, 
-    [string]$AltDestination2, 
+    [string]$AltDestination1,
+    [string]$AltDestination2,
     [string]$ConfigFile = (Join-Path $PSScriptRoot 'VeeamBR-OffloadCopy.json'),
     [switch]$DryRun
 )
@@ -87,7 +87,7 @@ $transcriptName = ""
 $copyDestPrimary = ""
 $copyDestSecondary = ""
 $copySource = ""
-$copyFlags    = @("/e", "/copy:dat", "/dcopy:dat", "/w:30", "/r:3", "/fft", "/z", "/np", "/mt:16", "/nfl") 
+$copyFlags    = @("/e", "/copy:dat", "/dcopy:dat", "/w:30", "/r:3", "/fft", "/z", "/np", "/mt:16", "/nfl")
 $copyOptions  = @("/mir", "/xf", "thumbs.db", "desktop.ini")
 $copyFlagsConfig = $copyFlags + @("/njh", "/njs")
 
@@ -131,7 +131,7 @@ function Test-RoboCopySuccess {
     # 2 = Some extra files in destination
     # 3 = Some files copied, some extra in destination
     # 4+ = Some files failed to copy (exit code 4-7 have varying degrees)
-    
+
     if ($ExitCode -ge 4) {
         $errorMsg = "ROBOCOPY $Operation failed with exit code $ExitCode (errors occurred during copy)"
         Write-Log $errorMsg "ERROR"
@@ -196,7 +196,7 @@ function Test-JsonConfig {
         Write-Error "Failed to read configuration file: $_"
         return $false
     }
-    
+
     if ([string]::IsNullOrWhiteSpace($raw)) {
         Write-Error "Configuration file is empty: $Path"
         return $false
@@ -220,9 +220,9 @@ function Test-JsonConfig {
 
 try {
     # Validate and load configuration file
-    if (-not (Test-JsonConfig -Path $ConfigFile)) { 
+    if (-not (Test-JsonConfig -Path $ConfigFile)) {
         Write-Error "Failed to validate configuration file. Exiting."
-        exit 1 
+        exit 1
     }
     $config = Get-Content -LiteralPath $ConfigFile -Raw | ConvertFrom-Json
 
@@ -234,33 +234,33 @@ try {
     $SmtpServer = $config.Smtp.Server
 
     # Validate config values are not empty
-    if ([string]::IsNullOrWhiteSpace($configBackupFolder)) { 
+    if ([string]::IsNullOrWhiteSpace($configBackupFolder)) {
         throw "VeeamConfigBackupFolder not set in config file: $ConfigFile"
     }
-    if ([string]::IsNullOrWhiteSpace($transcriptPath)) { 
+    if ([string]::IsNullOrWhiteSpace($transcriptPath)) {
         throw "LogPath not set in config file: $ConfigFile"
     }
-    if ([string]::IsNullOrWhiteSpace($MailTo)) { 
+    if ([string]::IsNullOrWhiteSpace($MailTo)) {
         throw "Smtp.To not set in config file: $ConfigFile"
     }
-    if ([string]::IsNullOrWhiteSpace($MailFrom)) { 
+    if ([string]::IsNullOrWhiteSpace($MailFrom)) {
         throw "Smtp.From not set in config file: $ConfigFile"
     }
-    if ([string]::IsNullOrWhiteSpace($SmtpServer)) { 
+    if ([string]::IsNullOrWhiteSpace($SmtpServer)) {
         throw "Smtp.Server not set in config file: $ConfigFile"
     }
 
     # Parameter check and normalization
     If ($BackupJobName.Length -le 0) { throw "Backup job name not specified." }
     If ($PrimaryDestination.Length -le 0) { throw "Primary destination path not specified." }
-    
+
     # Create/rotate transcript log file
     $transcriptName = ("VBR-OffloadCopy_" + $BackupJobName.Replace(" ", "") + "_Log.txt")
-    If ($transcriptPath.Length -gt 0 -and (Test-Path($transcriptPath))) { 
+    If ($transcriptPath.Length -gt 0 -and (Test-Path($transcriptPath))) {
         $transcriptFilename = Join-Path -Path $transcriptPath -ChildPath $transcriptName
         $script:ActiveLogFile = $transcriptFilename
     }
-    Else { 
+    Else {
         $transcriptFilename = Join-Path -Path $env:TEMP -ChildPath $transcriptName
         $script:ActiveLogFile = $transcriptFilename
     }
@@ -268,7 +268,7 @@ try {
     # Rotate the last 3 logs
     Rotate-TranscriptLogs -FilePath $transcriptFilename
 
-    # Start 
+    # Start
     $startDateTime = (Get-Date)
     Start-Transcript -Force -Path $transcriptFilename
 
@@ -290,11 +290,11 @@ try {
     }
 
     # Figure out which AltDestination to use for the SecondaryDestination value
-    If (Test-Path -Path $AltDestination1) { 
-        $SecondaryDestination = $AltDestination1 
+    If (Test-Path -Path $AltDestination1) {
+        $SecondaryDestination = $AltDestination1
     }
-    ElseIf (Test-Path -Path $AltDestination2) { 
-        $SecondaryDestination = $AltDestination2 
+    ElseIf (Test-Path -Path $AltDestination2) {
+        $SecondaryDestination = $AltDestination2
     }
     Else {
         $SecondaryDestination = ""
@@ -394,11 +394,11 @@ try {
             }
         }
         Else {
-            If($repoExtents.Length -gt 1) { 
-                throw "More than 1 repo extent exists ($($repoExtents.Length)). Not supported." 
+            If($repoExtents.Length -gt 1) {
+                throw "More than 1 repo extent exists ($($repoExtents.Length)). Not supported."
             }
-            Else { 
-                throw "Could not get extents for the repository: $($jobRepo.Name)" 
+            Else {
+                throw "Could not get extents for the repository: $($jobRepo.Name)"
             }
         }
     }
@@ -407,7 +407,7 @@ try {
     }
 
     Write-Log ""
-    Write-Log "Getting backup chain from the job..."    
+    Write-Log "Getting backup chain from the job..."
 
     # Get backup dir from the backup so we can append it to the repo path for the full path to the backup files
     $backupDir = $null
@@ -479,7 +479,7 @@ try {
 
         Write-Log "ROBOCOPY exit code: $primaryExitCode"
         $primaryStatus = if (Test-RoboCopySuccess -ExitCode $primaryExitCode -Operation "PRIMARY") { "SUCCESS" } else { "FAILED" }
-        
+
         $copyOperations += @{
             Destination = "PRIMARY"
             Source = $copySource
@@ -487,9 +487,9 @@ try {
             ExitCode = $primaryExitCode
             Status = $primaryStatus
         }
-        
+
         if ($primaryStatus -eq "FAILED") { $subjectStatus = "FAILED" }
-        
+
         If($configBackupSource.Length -gt 0) {
             Write-Log ""
             Write-Log "Copying configuration backup to primary location..."
@@ -504,7 +504,7 @@ try {
 
             Write-Log "ROBOCOPY exit code: $configPrimaryExitCode"
             $configPrimaryStatus = if (Test-RoboCopySuccess -ExitCode $configPrimaryExitCode -Operation "PRIMARY CONFIG") { "SUCCESS" } else { "FAILED" }
-            
+
             if ($configPrimaryStatus -eq "FAILED") {
                 $subjectStatus = "FAILED"
             }
@@ -517,7 +517,7 @@ try {
 
     ####################################################
     # Copy to Secondary path/destination
-    ####################################################   
+    ####################################################
     If($SecondaryDestination.Length -gt 0) {
         Write-Log ""
         Write-Log ""
@@ -544,10 +544,10 @@ try {
                 & ROBOCOPY "$copySource" "$copyDestSecondary" "*.*" @copyFlags @copyOptions 2>&1 | Out-String
             }
             $secondaryExitCode = $LASTEXITCODE
-            
+
             Write-Log "ROBOCOPY exit code: $secondaryExitCode"
             $secondaryStatus = if (Test-RoboCopySuccess -ExitCode $secondaryExitCode -Operation "SECONDARY") { "SUCCESS" } else { "FAILED" }
-            
+
             $copyOperations += @{
                 Destination = "SECONDARY"
                 Source = $copySource
@@ -555,13 +555,13 @@ try {
                 ExitCode = $secondaryExitCode
                 Status = $secondaryStatus
             }
-            
+
             if ($secondaryStatus -eq "FAILED") { $subjectStatus = "FAILED" }
 
             If ($configBackupSource.Length -gt 0) {
                 Write-Log ""
                 Write-Log "Copying configuration backup to secondary location..."
-                
+
                 if ($script:DryRunMode) {
                     Write-Log "Would execute: ROBOCOPY `"$configBackupSource`" `"$copyDestSecondaryConfig`" (with flags)" "DRYRUN"
                 }
@@ -569,10 +569,10 @@ try {
                     ROBOCOPY "$configBackupSource" "$copyDestSecondaryConfig" $copyFlagsConfig $copyOptions
                 }
                 $configSecondaryExitCode = $LASTEXITCODE
-                
+
                 Write-Log "ROBOCOPY exit code: $configSecondaryExitCode"
                 $configSecondaryStatus = if (Test-RoboCopySuccess -ExitCode $configSecondaryExitCode -Operation "SECONDARY CONFIG") { "SUCCESS" } else { "FAILED" }
-                
+
                 if ($configSecondaryStatus -eq "FAILED") {
                     $subjectStatus = "FAILED"
                 }
@@ -602,7 +602,7 @@ catch {
 
 # Surface warnings in the subject, but never mask a failure
 if ($subjectStatus -eq "Success" -and $warningMessages.Count -gt 0) {
-    $subjectStatus = "Warning"
+    $subjectStatus = "WARNING"
 }
 
 # Get the current time and calculate the duration
@@ -656,7 +656,7 @@ try {
 
     # Build HTML email body
     $reportTime = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    
+
     $operationRows = ""
     foreach ($op in $copyOperations) {
         $statusColor = switch ($op.Status) {
@@ -736,7 +736,7 @@ try {
             <strong>Time:</strong> $reportTime &nbsp;|&nbsp;
             <strong>Status:</strong> <span class="$(switch ($subjectStatus) { 'Success' { 'success' } 'Warning' { 'warning' } default { 'failed' } })"><strong>$subjectStatus</strong></span>
         </p>
-        
+
         <h3>Job Details</h3>
         $configSummary
 
