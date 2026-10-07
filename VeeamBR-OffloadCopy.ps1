@@ -600,6 +600,11 @@ catch {
     $subjectStatus = "FAILED"
 }
 
+# Surface warnings in the subject, but never mask a failure
+if ($subjectStatus -eq "Success" -and $warningMessages.Count -gt 0) {
+    $subjectStatus = "Warning"
+}
+
 # Get the current time and calculate the duration
 $endDateTime = (Get-Date)
 $duration = ($endDateTime - $startDateTime)
@@ -729,7 +734,7 @@ try {
         <p>
             <strong>Server:</strong> $Servername &nbsp;|&nbsp;
             <strong>Time:</strong> $reportTime &nbsp;|&nbsp;
-            <strong>Status:</strong> <span class="$(if ($subjectStatus -eq 'Success') { 'success' } else { 'failed' })"><strong>$subjectStatus</strong></span>
+            <strong>Status:</strong> <span class="$(switch ($subjectStatus) { 'Success' { 'success' } 'Warning' { 'warning' } default { 'failed' } })"><strong>$subjectStatus</strong></span>
         </p>
         
         <h3>Job Details</h3>
